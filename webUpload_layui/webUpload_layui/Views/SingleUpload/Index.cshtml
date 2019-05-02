@@ -1,0 +1,147 @@
+﻿
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>单文件切片上传 </title>
+    <script src="~/Scripts/jquery-3.3.1.js"></script>
+    <script src="~/Content/layui/layui.all.js"></script>
+    <link href="~/Content/layui/css/layui.css" rel="stylesheet" />
+    <script src="~/Content/webupload/webuploader.js"></script>
+    <link href="~/Content/webupload/webuploader.css" rel="stylesheet" />
+</head>
+<body>
+    <div class="container">
+        <div class="row">文件上传示例： <div  id="filePicker">选择文件</div></div>
+        <div class="row">
+            <table class="layui-table" lay-size="sm" lay-skin="row">
+                <thead>
+                    <tr>
+                        <th>
+                            <div class="layui-table-cell laytable-cell-2-status" align="center">
+                                <span>文件名</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="layui-table-cell laytable-cell-2-status" align="center">
+                                <span>大小</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="layui-table-cell laytable-cell-2-status" align="center">
+                                <span>状态</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="layui-table-cell laytable-cell-2-status" align="center">
+                                <span>进度</span>
+                            </div>
+                        </th>
+                        <th>
+                            <div class="layui-table-cell laytable-cell-2-status" align="center">
+                                <span>操作</span>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="FilesListView"></tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
+
+<script type="text/javascript">
+    $(function () {
+       var GUID = WebUploader.Base.guid();//一个GUID
+       var uploader = WebUploader.create({
+            swf:'../../Script/Uploader.swf',
+            server: '@Url.Action("UploadSingle")',
+            pick: '#filePicker',
+            multiple:false,
+            threads:4,  //启用线程，默认3
+            fileNumLimit:1, //只能上传一个文件
+            resize: false,
+            chunked: true,//开始分片上传
+            chunkSize:4096000,//每一片的大小
+            formData: {
+                guid: GUID //自定义参数，
+            }
+
+        });
+        uploader.on('fileQueued', function (file) {
+           var tr = $(['<tr id="upload-' + file.id + '">'
+                , '<td class="name"><a href="javascript:;">' + file.name + '</a></td>'
+                , '<td>' + (file.size / 1024).toFixed(1) + 'kb</td>'
+                , '<td id="wait_' + file.id + '" > 等待上传</td > '
+                , '<td>'
+                , '<div id="file_' + file.id + '" class="layui-progress layui-progress-big layui - progress - radius - fix" lay-showpercent="true" lay-filter="fileProcess' + file.id + '">'
+                , '<div class="layui-progress-bar" lay-percent="30%">'
+                , '<span class="layui-progress-text">0%</span>'
+                , '</div>'
+                , '</div>'
+                , '</td>'
+                , '<td id="' + file.id + '">'
+                , '<button class="layui-btn layui-btn-mini layui-btn-primary file-upload">上传</button>'
+                , '<button class="layui-btn layui-btn-mini layui-btn-danger file-delete ">删除</button>'
+                , '</td>'
+                , '</tr>'].join(''));
+            $("#FilesListView").append(tr);
+        });
+        uploader.on('uploadSuccess', function (file, response) {
+            $.post('@Url.Action("Merge")', { guid: GUID, fileName: file.name }, function (data) {
+                $("#wait_" + file.id).html("上传成功!");
+                layui.element.progress('fileProcess' + file.id, "100%");
+            });
+
+        });
+        uploader.on('uploadProgress', function (file, percentage) {
+            layui.element.progress('fileProcess' + file.id, (percentage) * 99 + "%");
+        });
+        uploader.on('uploadError', function () {
+            $("#wait_" + file.id).html("上传失败!");
+        });
+
+        $("#FilesListView").on("click", ".file-upload", function () {
+            var Id = $(this).parent().attr("id");
+            if ($(this).html() == "上传") {
+                $(this).html("暂停");
+                if ($("#wait_" + uploader.getFile(Id, true).id).html() != "上传成功!") {
+                    $("#wait_" + uploader.getFile(Id, true).id).html("正在上传...");
+                    uploader.upload();
+                } else { }
+            }
+            else if ($(this).html() == "暂停") {
+                $(this).html("上传");
+                if ($("#wait_" + uploader.getFile(Id, true).id).html() != "上传成功!") {
+                    $("#wait_" + uploader.getFile(Id, true).id).html("暂停中!");
+                    uploader.stop(true);
+                }
+            }
+
+        });
+
+       //执行删除方法，只是从客户端删除
+        $("#FilesListView").on("click", ".file-delete", function () {
+            $delete1 = $(this);                     //保存当前点击事件
+            layui.layer.confirm('确定删除？', {         //弹出是否删除框
+               btn: ['确定', '取消'] //按钮
+            }, function (index) { //确定
+              //执行删除
+               var Id = $delete1.parent().attr("id");
+                uploader.removeFile(uploader.getFile(Id, true));
+                $delete1.parent().parent().remove();
+                layer.close(index);
+            }, function (index) { //取消
+                layer.close(index);
+
+            });
+
+        });
+
+    });
+
+</script>
